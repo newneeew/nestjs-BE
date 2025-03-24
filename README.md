@@ -73,7 +73,3 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
-## Stay in touch
-
-- TeddyKwak - joke79@hanyang.ac.kr
-- 김강호
