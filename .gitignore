@@ -1,0 +1,22 @@
+# Logs
+logs
+*.log
+
+# Dependency directories
+node_modules/
+dist/
+
+# 환경 변수 파일
+.env
+
+# Docker 관련 파일
+.dockerignore
+docker-compose.yml
+Dockerfile
+
+# IDE 디렉토리
+.idea/
+
+# 기타 설정 파일
+.eslintrc.js
+.prettierrc
