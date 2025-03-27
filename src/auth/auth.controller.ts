@@ -1,17 +1,35 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Res,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ApiBody, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Response } from 'express';
 import { User } from '../user/entities/user.entity';
 import { CreateUserDto } from '../user/dto/create-user.dto';
 import { LoginUserDto } from '../user/dto/login-user.dto';
 import { SendEmailDto } from './dto/send-email.dto';
 import { VerifyEmailDto } from 'src/user/dto/verify-email.dto';
-import { RequestBodyObject } from '@nestjs/swagger/dist/interfaces/open-api-spec.interface';
 import { RequestWithUser } from './interfaces/RequestWithUsers';
+import { GoogleAuthGuard } from './guards/google-auth.guard';
+import { LocalAuthGuard } from './guards/local-auth.guard';
+import { AccessTokenGuard } from './guards/accessToken.guard';
+import { UserService } from '../user/user.service';
+import { TokenType } from '../common/enums/tokenType.enum';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly userService: UserService,
+  ) {}
 
   @Post('/signup')
   @ApiOperation({ summary: 'User Signup', description: 'User Signup' })
@@ -27,6 +45,7 @@ export class AuthController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @UseGuards(LocalAuthGuard)
   @Post('/login')
   @ApiBody({ type: LoginUserDto })
   @ApiResponse({ status: HttpStatus.OK, description: 'login success' })
@@ -35,38 +54,76 @@ export class AuthController {
     summary: 'Member Login',
     description: 'Member Login',
   })
-  async logIn(@Body() loginUserDto: LoginUserDto): Promise<User> {
-    return await this.authService.getAuthenticatedUser(loginUserDto);
-  }
+  async logIn(
+    @Req() req: RequestWithUser, // Express Response
+    @Res() response: Response,
+  ): Promise<void> {
+    const { user } = req;
+    const { token: accessToken, cookie: accessTokenCookie } =
+      await this.authService.generateToken(user.id, TokenType.ACCESS);
+    const { token: refreshToken, cookie: refreshTokenCookie } =
+      await this.authService.generateToken(user.id, TokenType.REFRESH);
 
-  async loggedIn(@Req() request: RequestWithUser){
-    const {user} = request;
-    const accessToken = await this.authService.generateAccessToken();
+    await this.userService.setCurrentRefreshTokenToRedis(refreshToken, user.id);
+
+    user.password = undefined;
+    req.res.setHeader('Set-Cookie', [accessTokenCookie, refreshTokenCookie]);
+
+    response.send({ user, accessToken, refreshToken });
   }
 
   @Get()
   @UseGuards(AccessTokenGuard)
-  async getUserInfo(@Req() req: RequestBodyObject)
+  @ApiOperation({ summary: 'Get User Info', description: 'Get User Info' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'User Info success',
+    type: User,
+  })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'forbidden' })
+  async authenticate(@Req() req: RequestWithUser): Promise<User> {
+    return await req.user;
+  }
+  // async getUserInfo(@Req() req: RequestBodyObject): Promise<User> {
+  //   return await req.user;
+  // }
 
-  @Post('/send/email')
+  @Post('/email/send')
+  @ApiBody({ type: SendEmailDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'email send success' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad Request' })
+  @ApiOperation({
+    summary: 'Send Email',
+    description: 'Send Email',
+  })
   async sendEmail(@Body() sendEmailDto: SendEmailDto): Promise<void> {
-    return await this.authService.emailVerify(sendEmailDto);
+    return await this.authService.emailVerify(sendEmailDto.email);
   }
 
-  @Post("/verify/email")
-  async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto): Promise<Boolean> {
+  @Post('email/verify')
+  @ApiBody({ type: VerifyEmailDto })
+  @ApiResponse({ status: 200, description: 'Check Email of Verification' })
+  @ApiResponse({ status: 400, description: 'Bad Request' })
+  @ApiOperation({
+    summary: 'Verifiy Email',
+    description: 'Verifiy Email',
+  })
+  async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto): Promise<any> {
     return await this.authService.confirmEmail(verifyEmailDto);
   }
+  // async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto): Promise<Boolean> {
+  //   return await this.authService.confirmEmail(verifyEmailDto);
+  // }
 
-  @Get("/google")
+  @Get('/google')
   @UseGuards(GoogleAuthGuard)
   async googleLogin(): Promise<any> {
     return HttpStatus.OK;
   }
 
-  @Get("/google/callback")
+  @Get('/google/callback')
   @UseGuards(GoogleAuthGuard)
-  async googleLoginCallback(@Req() req: RequestWithUser): Promise<User>  {
+  async googleLoginCallback(@Req() req: RequestWithUser): Promise<User> {
     return req.user;
   }
 }
