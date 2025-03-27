@@ -6,11 +6,17 @@ import { ConfigModule } from '@nestjs/config';
 import { EmailModule } from 'src/email/email.module';
 import { JwtModule } from '@nestjs/jwt';
 import { AccessTokenStrategy } from './strategies/accessToken.strategy';
-
+import { LocalAuthStrategy } from './strategies/local-auth.strategy';
+import { GoogleAuthStrategy } from './strategies/google-auth.strategy';
 
 @Module({
   imports: [ConfigModule, UserModule, EmailModule, JwtModule.register({})],
   controllers: [AuthController],
-  providers: [AuthService, LocalAuthStrategy, AccessTokenStrategy, GoogleAuthStrategy,],
+  providers: [
+    AuthService,
+    LocalAuthStrategy,
+    AccessTokenStrategy,
+    GoogleAuthStrategy,
+  ],
 })
 export class AuthModule {}
