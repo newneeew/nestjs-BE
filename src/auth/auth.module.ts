@@ -8,9 +8,16 @@ import { JwtModule } from '@nestjs/jwt';
 import { AccessTokenStrategy } from './strategies/accessToken.strategy';
 import { LocalAuthStrategy } from './strategies/local-auth.strategy';
 import { GoogleAuthStrategy } from './strategies/google-auth.strategy';
+import { CacheModule } from '@nestjs/common/cache';
 
 @Module({
-  imports: [ConfigModule, UserModule, EmailModule, JwtModule.register({})],
+  imports: [
+    ConfigModule,
+    UserModule,
+    EmailModule,
+    JwtModule.register({}),
+    CacheModule.register(),
+  ],
   controllers: [AuthController],
   providers: [
     AuthService,
